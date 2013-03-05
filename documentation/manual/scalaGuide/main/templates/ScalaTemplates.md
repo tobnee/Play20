@@ -116,6 +116,9 @@ You can use the `for` keyword, in a pretty standard way:
 </ul>
 ```
 
+> **Note:** Make sure that `{` is on the same line with `for` to indicate that the expression continues to next line.  
+
+
 ## If-blocks
 
 If-blocks are nothing special. Simply use Scala’s standard `if` statement:
@@ -193,7 +196,7 @@ To make an absolute resolution, use **_root_** prefix in the import statement.
 If you have common imports, which you need in all templates, you can declare in `project/Build.scala`
 
 ```
-val main = PlayProject(…).settings(
+val main = play.Project(…).settings(
   templatesImport += "com.abc.backend._"
 )
 ```

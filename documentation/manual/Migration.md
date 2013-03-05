@@ -23,7 +23,7 @@ val main = play.Project(appName, appVersion, appDependencies).settings(
 Lastly, update your `project/build.properties` file:
 
 ```
-sbt.version=0.12.1
+sbt.version=0.12.2
 ```
 
 Then clean and re-compile your project using the `play` command in the **Play 2.1.0** distribution:
@@ -76,6 +76,10 @@ The `mainLang` parameter for the project is not required anymore. The main langu
 
 Also related to modularization, the `play.data` package and its dependencies were moved out from play core to `javaCore` artifact. As a consequence of this, `play.mvc.Controller#form` was moved to `play.data.Form#form`
 
+## play.db.ebean.Model.Finder.join() renamed to fetch()
+
+As part of the cleanup the Finder API join methods are replaced with fetch methods. They behave exactly same.
+
 ## Play's Promise to become Scala's Future
 
 With the introduction of `scala.concurrent.Future` in Scala 2.10 the scala ecosystem made a huge jump to unify the various Future and Promise libraries out there.
@@ -95,7 +99,9 @@ import akka.util.duration._
 def stream = Action {
     AsyncResult {
       implicit val timeout = Timeout(5.seconds)
-      (ChatRoomActor.ref ? (Join()) ).mapTo[Enumerator[String]].asPromise.map { chunks =>
+      val akkaFuture =  (ChatRoomActor.ref ? (Join()) ).mapTo[Enumerator[String]]
+      //convert to play promise before sending the response
+      akkaFuture.asPromise.map { chunks =>
         Ok.stream(chunks &> Comet( callback = "parent.message"))
       }
     }
@@ -115,7 +121,8 @@ import scala.concurrent.duration._
   def stream = Action {
     AsyncResult {
       implicit val timeout = Timeout(5.seconds)
-      (ChatRoomActor.ref ? (Join()) ).mapTo[Enumerator[String]].map { chunks =>
+      val scalaFuture = (ChatRoomActor.ref ? (Join()) ).mapTo[Enumerator[String]]
+      scalaFuture.map { chunks =>
         Ok.stream(chunks &> Comet( callback = "parent.message"))
       }
     }
@@ -134,7 +141,7 @@ Generally speaking, if you see error message "error: could not find implicit val
 import play.api.libs.concurrent.Execution.Implicits._
 ```
 
-_(Please see the Scala documentation about Execution context for more informations)_
+_(Please see the [Scala documentation about Execution context](http://docs.scala-lang.org/overviews/core/futures.html) for more information)_
 
 And remember that:
 
@@ -253,12 +260,7 @@ val jsonObject = Json.obj(
 )
 ```
 
-More information about these features can be found here:
-
-http://mandubian.com/2012/09/08/unveiling-play-2-dot-1-json-api-part1-jspath-reads-combinators/
-
-_(TODO: Integrate this to the documentation)_
-
+More information about these features can be found [[at the Json documentation|ScalaJson]].
 
 ## Changes to Cookie handling
 
@@ -279,3 +281,14 @@ requireJs := "main.js"
 ```
 
 More information about this feature can be found on the [[RequireJS documentation page|RequireJS-support]].
+
+## Changes to H2 in-memory DB
+
+By default, the H2 in-memory DB will lose all of its content when the last DB connection to it is closed. In **Play 2.0**, connections were accidentally left open, so this was rarely noticed. 
+
+However, in **Play 2.1**, connections are properly closed, so if you use default H2 settings, evolutions and the h2-browser won't work correctly. To work around this, specify the H2 URL with the `DB_CLOSE_DELAY` parameter set to `-1`:
+
+```
+db.default.driver=org.h2.Driver
+db.default.url="jdbc:h2:mem:play;DB_CLOSE_DELAY=-1"
+```

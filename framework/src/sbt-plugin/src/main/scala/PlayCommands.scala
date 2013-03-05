@@ -86,9 +86,9 @@ trait PlayCommands extends PlayAssetsCompiler with PlayEclipse {
   }
 
   val buildRequire = TaskKey[Seq[(JFile, JFile)]]("play-build-require-assets")
-  val buildRequireTask = (copyResources in Compile, crossTarget, requireJs, requireNativePath, streams) map { (cr, crossTarget, requireJs, requireNativePath,  s) =>
+  val buildRequireTask = (copyResources in Compile, crossTarget, requireJs, requireJsFolder, requireJsShim, requireNativePath, streams) map { (cr, crossTarget, requireJs, requireJsFolder, requireJsShim, requireNativePath,  s) =>
     val buildDescName = "app.build.js"
-    val jsFolder = "javascripts"
+    val jsFolder = if(!requireJsFolder.isEmpty) {requireJsFolder} else "javascripts"
     val rjoldDir = crossTarget / "classes" / "public" / jsFolder
     val buildDesc = crossTarget / "classes" / "public" / buildDescName
     if (requireJs.isEmpty == false) {
@@ -96,10 +96,12 @@ trait PlayCommands extends PlayAssetsCompiler with PlayEclipse {
       //cleanup previous version
       IO.delete(rjnewDir)
       val relativeModulePath = (str: String) => str.replace(".js", "")
+      val shim = if (!requireJsShim.isEmpty) {"""mainConfigFile: """" + jsFolder + """/""" + requireJsShim + """", """} else {""};
       val content =  """({appDir: """" + jsFolder + """",
           baseUrl: ".",
-          dir:"""" + rjnewDir.getName + """",
-          modules: [""" + requireJs.map(f => "{name: \"" + relativeModulePath(f) + "\"}").mkString(",") + """]})""".stripMargin
+          dir:"""" + rjnewDir.getName + """", """ +
+          shim +
+          """modules: [""" + requireJs.map(f => "{name: \"" + relativeModulePath(f) + "\"}").mkString(",") + """]})""".stripMargin
 
       IO.write(buildDesc,content)
       //run requireJS
@@ -499,7 +501,7 @@ exec java $* -cp $classpath """ + customFileName.map(fn => "-Dconfig.file=`dirna
     val sbtLoader = this.getClass.getClassLoader
     def commonLoaderEither = Project.runTask(playCommonClassloader, state).get._2.toEither
     val commonLoader = commonLoaderEither.right.toOption.getOrElse {
-      state.log.warn("some of the dependencies were not recompiled properly, so classloader is not avaialable")
+      state.log.warn("Some of the dependencies were not recompiled properly, so classloader is not available")
       throw commonLoaderEither.left.get
     }
     val maybeNewState = Project.runTask(dependencyClasspath in Compile, state).get._2.toEither.right.map { dependencies =>
@@ -787,7 +789,7 @@ exec java $* -cp $classpath """ + customFileName.map(fn => "-Dconfig.file=`dirna
       """
       |This software is licensed under the Apache 2 license, quoted below.
       |
-      |Copyright 2012 Typesafe <http://www.typesafe.com>
+      |Copyright 2013 Typesafe <http://www.typesafe.com>
       |
       |Licensed under the Apache License, Version 2.0 (the "License"); you may not
       |use this file except in compliance with the License. You may obtain a copy of
